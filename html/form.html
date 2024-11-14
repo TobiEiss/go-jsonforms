@@ -7,6 +7,17 @@
 <div>
   {{ template "Elements" . }}
 </div>
+{{ else if eq .Type "Group" }}
+<div class="card">
+  {{ if .Label }}
+  <div class="card-header">
+    <div class="card-title h5">{{ .Label }}</div>
+  </div>
+  {{ end }}
+  <div class="card-body">
+    {{ template "Elements" . }}
+  </div>
+</div>
 {{ else if eq .Type "Label" }}
 <h3>{{ .Text }}</h3>
 {{ else if eq .Type "Control" }}

@@ -3,6 +3,7 @@ package gojsonforms
 type UISchema struct {
 	Type     string     `json:"type"`
 	Elements UIElements `json:"elements"`
+	Label    string     `json:"label"`
 }
 
 type UIElement struct {
@@ -11,6 +12,7 @@ type UIElement struct {
 	Text        string     `json:"text,omitempty"`
 	Elements    UIElements `json:"elements,omitempty"`
 	Suggestions []string   `json:"suggestion,omitempty"`
+	Label       string     `json:"label"`
 }
 
 type UIElements []UIElement
