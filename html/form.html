@@ -35,7 +35,7 @@
 {{ end }}
 
 {{ define "Control" }}
-<div class="form-group column col-{{ colWidth .Scope }}">
+<div class="form-group{{ colWidthClass .Scope }}">
   <label class="form-label" for="{{ .Scope }}">{{ .Label }}</label>
   {{ if .enum }}
   <select class="form-select" list="{{ .Scope }}">

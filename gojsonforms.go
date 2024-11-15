@@ -2,6 +2,7 @@ package gojsonforms
 
 import (
 	"embed"
+	"fmt"
 	"html/template"
 	"net/url"
 	"strconv"
@@ -12,8 +13,20 @@ import (
 var resources embed.FS
 
 type SchemaJson map[string]interface{}
+type Screen struct {
+	Titel string
+	Link  string
+}
 
-func BuildTemplate(schema SchemaJson, uiSchema UISchema) (string, error) {
+func BuildSinglePage(schema SchemaJson, uiSchema UIElement) (string, error) {
+	return buildTemplate([]Screen{}, schema, uiSchema)
+}
+
+func BuildScreenPage(screens []Screen, schema SchemaJson, uiSchema UIElement) (string, error) {
+	return buildTemplate(screens, schema, uiSchema)
+}
+
+func buildTemplate(screens []Screen, schema SchemaJson, uiSchema UIElement) (string, error) {
 	var builder strings.Builder
 
 	find := func(path string) SchemaJson {
@@ -25,16 +38,22 @@ func BuildTemplate(schema SchemaJson, uiSchema UISchema) (string, error) {
 		return element
 	}
 
-	colWidth := func(scope string) int {
-		return 12 / len(uiSchema.Elements.FindElementWithChild(scope))
+	colWidthClass := func(scope string) string {
+		parent := uiSchema.FindElementWithChild(scope)
+		if parent.Type != "HorizontalLayout" {
+			return ""
+		}
+
+		return fmt.Sprintf(" column col-%d", 12/len(parent.Elements))
 	}
 
-	tmpl, err := template.New("").Funcs(template.FuncMap{"find": find, "colWidth": colWidth}).ParseFS(resources, "html/*")
+	tmpl, err := template.New("").Funcs(template.FuncMap{"find": find, "colWidthClass": colWidthClass}).ParseFS(resources, "html/*")
 	if err != nil {
 		return builder.String(), err
 	}
 
 	err = tmpl.ExecuteTemplate(&builder, "index.html", map[string]interface{}{
+		"Screens":  screens,
 		"UISchema": uiSchema,
 		"Schema":   schema,
 	})

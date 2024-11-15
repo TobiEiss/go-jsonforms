@@ -1,33 +1,22 @@
 package gojsonforms
 
-type UISchema struct {
-	Type     string     `json:"type"`
-	Elements UIElements `json:"elements"`
-	Label    string     `json:"label"`
-}
-
 type UIElement struct {
-	Type        string     `json:"type"`
-	Scope       string     `json:"scope,omitempty"`
-	Text        string     `json:"text,omitempty"`
-	Elements    UIElements `json:"elements,omitempty"`
-	Suggestions []string   `json:"suggestion,omitempty"`
-	Label       string     `json:"label"`
+	Type        string      `json:"type"`
+	Scope       string      `json:"scope,omitempty"`
+	Text        string      `json:"text,omitempty"`
+	Elements    []UIElement `json:"elements,omitempty"`
+	Suggestions []string    `json:"suggestion,omitempty"`
+	Label       string      `json:"label"`
 }
 
-type UIElements []UIElement
-
-func (elements UIElements) FindElementWithChild(scope string) UIElements {
-	if elements == nil {
-		return nil
-	}
-
-	for _, child := range elements {
-		if child.Scope == scope {
-			return elements
+func (element *UIElement) FindElementWithChild(scope string) *UIElement {
+	for i := range element.Elements {
+		if element.Elements[i].Scope == scope {
+			return element
 		}
-		if result := child.Elements.FindElementWithChild(scope); result != nil {
-			return result
+
+		if found := element.Elements[i].FindElementWithChild(scope); found != nil {
+			return found
 		}
 	}
 	return nil

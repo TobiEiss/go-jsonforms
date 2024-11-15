@@ -8,27 +8,33 @@
   <script src="https://unpkg.com/htmx.org@2.0.2"></script>
   <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
   <style>
+    .content {
+      flex: 1;
+      padding: 20px;
+    }
+
     /* Default padding for mobile devices */
     .container {
-      padding-left: 20px;
-      padding-right: 20px;
+      display: flex;
+      height: 100vh;
+      padding-left: 0;
+      padding-right: 0;
       margin: 0 auto;
-      max-width: 100%;
     }
 
     /* Tablet devices */
     @media screen and (min-width: 768px) {
       .container {
-        padding-left: 40px;
-        padding-right: 40px;
+        padding-left: 0;
+        padding-right: 0;
       }
     }
 
     /* Desktop devices */
     @media screen and (min-width: 1024px) {
       .container {
-        padding-left: 80px;
-        padding-right: 80px;
+        padding-left: 0;
+        padding-right: 0;
         max-width: 1440px;
         /* Maximum width for very large screens */
       }
@@ -37,15 +43,51 @@
     .column {
       padding: .4rem;
     }
+
+    .nav {
+      width: 200px;
+      background-color: #f1f1f1;
+      padding: 20px;
+      height: 100vh;
+    }
+
+    .nav-link {
+      display: block;
+      padding: 10px 0;
+      color: #333;
+      text-decoration: none;
+    }
+
+    .nav-link:hover {
+      color: #000;
+    }
+
+    .form-group {
+      min-width: 200px;
+    }
   </style>
 </head>
 
 <body>
-  <main class="container">
-    <div>
-      {{ template "Screen" . }}
+  <div class="container">
+    {{ if .Screens }}
+    <div class="sidebar">
+      <ul class="nav">
+        {{ range .Screens }}
+        <li class="nav-item">
+          <a href="/{{ .Link }}">{{ .Titel }}</a>
+        </li>
+        {{ end }}
+      </ul>
     </div>
-  </main>
+    {{end}}
+
+    <div class="content">
+      <div>
+        {{ template "Screen" . }}
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

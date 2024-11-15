@@ -16,51 +16,63 @@ var screens = map[string]struct {
 	Schema   string
 	UISchema string
 }{
-	"Basic": {
+	"basic": {
 		Schema:   "testdata/basic/schema.json",
 		UISchema: "testdata/basic/uischema.json",
 	},
-	"Control": {
+	"control": {
 		Schema:   "testdata/control/schema.json",
 		UISchema: "testdata/control/uischema.json",
-	},
-	"RealExample": {
-		Schema:   "testdata/realexample/schema.json",
-		UISchema: "testdata/realexample/uischema.json",
 	},
 }
 
 func main() {
-	schemaData, err := os.ReadFile(screens["RealExample"].Schema)
-	if err != nil {
-		panic(err)
-	}
-
-	uiSchemaData, err := os.ReadFile(screens["RealExample"].UISchema)
-	if err != nil {
-		panic(err)
-	}
-
-	var schema gojsonforms.SchemaJson
-	if err := json.Unmarshal(schemaData, &schema); err != nil {
-		panic(err)
-	}
-
-	var uischema gojsonforms.UIElement
-	if err := json.Unmarshal(uiSchemaData, &uischema); err != nil {
-		panic(err)
-	}
-
-	html, err := gojsonforms.BuildSinglePage(schema, uischema)
-	if err != nil {
-		panic(err)
-	}
-
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
-	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	router.Get("/{screen}", func(w http.ResponseWriter, r *http.Request) {
+		screenID := chi.URLParam(r, "screen")
+		if screenID == "" {
+			screenID = "basic"
+		}
+
+		schemaData, err := os.ReadFile(screens[screenID].Schema)
+		if err != nil {
+			panic(err)
+		}
+
+		uiSchemaData, err := os.ReadFile(screens[screenID].UISchema)
+		if err != nil {
+			panic(err)
+		}
+
+		var schema gojsonforms.SchemaJson
+		if err := json.Unmarshal(schemaData, &schema); err != nil {
+			panic(err)
+		}
+
+		var uischema gojsonforms.UIElement
+		if err := json.Unmarshal(uiSchemaData, &uischema); err != nil {
+			panic(err)
+		}
+
+		screens := []gojsonforms.Screen{
+			{
+				Titel: "Basic Form",
+				Link:  "basic",
+			},
+			{
+				Titel: "Control Form",
+				Link:  "control",
+			},
+		}
+		html, err := gojsonforms.BuildScreenPage(screens, schema, uischema)
+		if err != nil {
+			panic(err)
+		}
+
 		fmt.Fprintf(w, html)
 	})
+
 	router.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		err := r.ParseForm()
 		if err != nil {
