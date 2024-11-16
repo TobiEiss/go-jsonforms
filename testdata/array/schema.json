@@ -1,0 +1,19 @@
+{
+  "properties": {
+    "comments": {
+      "type": "array",
+      "title": "Comments",
+      "items": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

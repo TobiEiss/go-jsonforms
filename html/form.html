@@ -1,3 +1,6 @@
+<!-- ============= -->
+<!-- Form template -->
+<!-- ============= -->
 {{ define "Form" }}
 {{ if eq .Type "HorizontalLayout" }}
 <div class="columns">
@@ -21,12 +24,19 @@
 {{ else if eq .Type "Label" }}
 <h3>{{ .Text }}</h3>
 {{ else if eq .Type "Control" }}
-{{ template "Control" (find .Scope) }}
+{{ $control := (find .Scope) }}
+{{ if eq $control.type "array" }}
+{{ template "Array" . }}
+{{ else }}
+{{ template "Control" $control }}
+{{ end }}
 {{ end }}
 {{ end }}
 
+<!-- ================= -->
+<!-- Elements template -->
+<!-- ================= -->
 {{ define "Elements" }}
-<!-- iterate Elements if there are any -->
 {{ if .Elements}}
 {{ range .Elements }}
 {{ template "Form" . }}
@@ -34,6 +44,9 @@
 {{ end }}
 {{ end }}
 
+<!-- ================ -->
+<!-- Control template -->
+<!-- ================ -->
 {{ define "Control" }}
 <div class="form-group{{ colWidthClass .Scope }}">
   <label class="form-label" for="{{ .Scope }}">{{ .Label }}</label>
@@ -53,8 +66,8 @@
   {{ $type = "text" }}
   {{ end }}
   <input class="form-input" id="{{ .Scope }}" name="{{ .Scope }}" type="{{$type}}"
-    aria-describedby="{{ .Scope }}-helper" {{ if .maximum }} max="{{.maximum}}" {{ end }} {{ if .minimum }}
-    min="{{ .minimum }}" {{ end }}>
+    aria-describedby="{{ .Scope }}-helper" {{ findData .Scope }} {{ if .maximum }} max="{{.maximum}}" {{ end }} {{ if
+    .minimum }} min="{{ .minimum }}" {{ end }}>
   {{ end }} <!-- else -->
   {{ if .description }}
   <small id="{{ .Scope }}-helper">
@@ -63,3 +76,15 @@
   {{ end }}
 </div>
 {{ end }} <!-- control -->
+
+<!-- ============== -->
+<!-- Array template -->
+<!-- ============== -->
+{{ define "Array"}}
+<!-- TODO: range over data -->
+{{ . }}
+{{ $items := generateItems .Scope }}
+{{ range $items }}
+{{ template "Form" . }}
+{{ end }}
+{{ end }}

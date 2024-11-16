@@ -12,17 +12,18 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-var screens = map[string]struct {
-	Schema   string
-	UISchema string
-}{
-	"basic": {
-		Schema:   "testdata/basic/schema.json",
-		UISchema: "testdata/basic/uischema.json",
+var screens = []gojsonforms.Screen{
+	{
+		Link:  "basic",
+		Titel: "Basic Forms",
 	},
-	"control": {
-		Schema:   "testdata/control/schema.json",
-		UISchema: "testdata/control/uischema.json",
+	{
+		Link:  "control",
+		Titel: "Control Forms",
+	},
+	{
+		Link:  "array",
+		Titel: "Array Forms",
 	},
 }
 
@@ -35,15 +36,17 @@ func main() {
 			screenID = "basic"
 		}
 
-		schemaData, err := os.ReadFile(screens[screenID].Schema)
+		schemaData, err := os.ReadFile(fmt.Sprintf("testdata/%s/schema.json", screenID))
 		if err != nil {
 			panic(err)
 		}
 
-		uiSchemaData, err := os.ReadFile(screens[screenID].UISchema)
+		uiSchemaData, err := os.ReadFile(fmt.Sprintf("testdata/%s/uischema.json", screenID))
 		if err != nil {
 			panic(err)
 		}
+
+		dataData, _ := os.ReadFile(fmt.Sprintf("testdata/%s/data.json", screenID))
 
 		var schema gojsonforms.SchemaJson
 		if err := json.Unmarshal(schemaData, &schema); err != nil {
@@ -55,17 +58,17 @@ func main() {
 			panic(err)
 		}
 
-		screens := []gojsonforms.Screen{
-			{
-				Titel: "Basic Form",
-				Link:  "basic",
-			},
-			{
-				Titel: "Control Form",
-				Link:  "control",
-			},
+		var html string
+		if dataData != nil {
+			var data map[string]interface{}
+			if err := json.Unmarshal(dataData, &data); err != nil {
+				panic(err)
+			}
+			html, err = gojsonforms.BuildScreenPageWithData(screens, schema, uischema, data)
+		} else {
+			html, err = gojsonforms.BuildScreenPage(screens, schema, uischema)
 		}
-		html, err := gojsonforms.BuildScreenPage(screens, schema, uischema)
+
 		if err != nil {
 			panic(err)
 		}
