@@ -70,10 +70,10 @@
 
 <body>
   <div class="container">
-    {{ if .Screens }}
+    {{ if .Menu }}
     <div class="sidebar">
       <ul class="nav">
-        {{ range .Screens }}
+        {{ range .Menu }}
         <li class="nav-item">
           <a href="/{{ .Link }}">{{ .Titel }}</a>
         </li>

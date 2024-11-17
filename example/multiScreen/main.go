@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-var screens = []gojsonforms.Screen{
+var menu = []gojsonforms.MenuItem{
 	{
 		Link:  "basic",
 		Titel: "Basic Forms",
@@ -48,27 +48,21 @@ func main() {
 
 		dataData, _ := os.ReadFile(fmt.Sprintf("testdata/%s/data.json", screenID))
 
-		var schema gojsonforms.SchemaJson
-		if err := json.Unmarshal(schemaData, &schema); err != nil {
+		site, err := gojsonforms.New(schemaData, uiSchemaData)
+		if err != nil {
 			panic(err)
 		}
 
-		var uischema gojsonforms.UIElement
-		if err := json.Unmarshal(uiSchemaData, &uischema); err != nil {
-			panic(err)
-		}
-
-		var html string
 		if dataData != nil {
-			var data map[string]interface{}
-			if err := json.Unmarshal(dataData, &data); err != nil {
+			err = site.BindData(dataData)
+			if err != nil {
 				panic(err)
 			}
-			html, err = gojsonforms.BuildScreenPageWithData(screens, schema, uischema, data)
-		} else {
-			html, err = gojsonforms.BuildScreenPage(screens, schema, uischema)
 		}
 
+		site.SetMenu(menu)
+
+		html, err := site.Build()
 		if err != nil {
 			panic(err)
 		}

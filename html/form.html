@@ -2,34 +2,42 @@
 <!-- Form template -->
 <!-- ============= -->
 {{ define "Form" }}
-{{ if eq .Type "HorizontalLayout" }}
+{{ if eq .type "HorizontalLayout" }}
 <div class="columns">
   {{ template "Elements" . }}
 </div>
-{{ else if eq .Type "VerticalLayout" }}
+{{ else if eq .type "VerticalLayout" }}
 <div>
   {{ template "Elements" . }}
 </div>
-{{ else if eq .Type "Group" }}
+{{ else if eq .type "Group" }}
 <div class="card">
-  {{ if .Label }}
+  {{ if .label }}
   <div class="card-header">
-    <div class="card-title h5">{{ .Label }}</div>
+    <div class="card-title h5">{{ .label }}</div>
   </div>
   {{ end }}
   <div class="card-body">
     {{ template "Elements" . }}
   </div>
 </div>
-{{ else if eq .Type "Label" }}
-<h3>{{ .Text }}</h3>
-{{ else if eq .Type "Control" }}
-{{ $control := (find .Scope) }}
-{{ if eq $control.type "array" }}
+{{ else if eq .type "Label" }}
+<h3>{{ .text }}</h3>
+{{ else if eq .type "Control" }}
+{{ if eq .schema.type "array" }}
 {{ template "Array" . }}
 {{ else }}
-{{ template "Control" $control }}
+{{ template "Control" . }}
 {{ end }}
+{{ end }}
+{{ end }}
+
+<!-- =============== -->
+<!-- Array template -->
+<!-- =============== -->
+{{ define "Array" }}
+{{ range .options.detail }}
+{{ template "Form" . }}
 {{ end }}
 {{ end }}
 
@@ -37,8 +45,8 @@
 <!-- Elements template -->
 <!-- ================= -->
 {{ define "Elements" }}
-{{ if .Elements}}
-{{ range .Elements }}
+{{ if .elements}}
+{{ range .elements }}
 {{ template "Form" . }}
 {{ end }}
 {{ end }}
@@ -48,43 +56,38 @@
 <!-- Control template -->
 <!-- ================ -->
 {{ define "Control" }}
-<div class="form-group{{ colWidthClass .Scope }}">
-  <label class="form-label" for="{{ .Scope }}">{{ .Label }}</label>
-  {{ if .enum }}
-  <select class="form-select" list="{{ .Scope }}">
-    {{ range .enum }}
+<div class="form-group{{ if .schema.col }}{{ .schema.col }}{{ end }}">
+  {{ if .label }}
+  <label class="form-label" for="{{ .scope }}">{{ .label }}</label>
+  {{ end }}
+
+  <!-- enum -->
+  {{ if .schema.enum }}
+  <select class="form-select" list="{{ .scope }}">
+    {{ range .schema.enum }}
     <option value="{{ . }}">{{ . }}</option>
     {{ end }}
   </select>
+  <!-- no enum -->
   {{ else }}
-  {{ $type := .type }}
+
+  <!-- type -->
+  {{ $type := .schema.type }}
   {{ if eq $type "integer" }}
   {{ $type = "number" }}
-  {{ else if eq .format "date" }}
+  {{ else if eq .schema.format "date" }}
   {{ $type = "date" }}
   {{ else if eq $type "string" }}
   {{ $type = "text" }}
   {{ end }}
-  <input class="form-input" id="{{ .Scope }}" name="{{ .Scope }}" type="{{$type}}"
-    aria-describedby="{{ .Scope }}-helper" {{ findData .Scope }} {{ if .maximum }} max="{{.maximum}}" {{ end }} {{ if
-    .minimum }} min="{{ .minimum }}" {{ end }}>
-  {{ end }} <!-- else -->
-  {{ if .description }}
-  <small id="{{ .Scope }}-helper">
-    {{ .description }}
+  <!-- end type -->
+  <input class="form-input" id="{{ .scope }}" name="{{ .scope }}" type="{{ $type }}"
+    aria-describedby="{{ .scope }}-helper" {{ if .data }}value="{{ .data }}" {{ end }} />
+  {{ if .schema.description }}
+  <small id="{{ .schema.scope }}-helper">
+    {{ .schema.description }}
   </small>
+  {{ end }}
   {{ end }}
 </div>
 {{ end }} <!-- control -->
-
-<!-- ============== -->
-<!-- Array template -->
-<!-- ============== -->
-{{ define "Array"}}
-<!-- TODO: range over data -->
-{{ . }}
-{{ $items := generateItems .Scope }}
-{{ range $items }}
-{{ template "Form" . }}
-{{ end }}
-{{ end }}

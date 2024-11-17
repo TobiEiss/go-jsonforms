@@ -2,12 +2,12 @@ package gojsonforms
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
-	"log/slog"
 	"net/url"
-	"regexp"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -17,129 +17,191 @@ import (
 //go:embed html/*
 var resources embed.FS
 
-type SchemaJson map[string]interface{}
-type Screen struct {
-	Titel string
+type Form struct {
+	schema   *gabs.Container
+	uiSchema *gabs.Container
+	data     *gabs.Container
+	menu     []MenuItem
+}
+
+type MenuItem struct {
 	Link  string
+	Titel string
 }
 
-func BuildSinglePage(schema SchemaJson, uiSchema UIElement) (string, error) {
-	return buildTemplate([]Screen{}, schema, uiSchema, nil)
+func New(schema []byte, uiSchema []byte) (Form, error) {
+	var form Form
+	schemaParsed, err := gabs.ParseJSON(schema)
+	if err != nil {
+		return form, err
+	}
+
+	uiSchemaParsed, err := gabs.ParseJSON(uiSchema)
+	if err != nil {
+		return form, err
+	}
+
+	form.schema = schemaParsed
+	form.uiSchema = uiSchemaParsed
+	err = form.setup()
+
+	return form, err
 }
 
-func BuildScreenPage(screens []Screen, schema SchemaJson, uiSchema UIElement) (string, error) {
-	return buildTemplate(screens, schema, uiSchema, nil)
+func (form *Form) setup() error {
+	var err error
+
+	// add schema-information as schema to every control
+	iterateObj(form.uiSchema, "type", "Control", func(c *gabs.Container) {
+		scope, ok := c.Path("scope").Data().(string)
+		if !ok {
+			err = errors.New(fmt.Sprintf("in %v is no scope", c))
+		}
+
+		for k, v := range form.schema.Path(gabsPath(scope, true)).ChildrenMap() {
+			// "simple" (not nested) object
+			if len(v.Children()) == 0 {
+				c.SetP(v, fmt.Sprintf("schema.%s", k))
+			}
+			// arrays (for e.g. items)
+			if _, err := v.ArrayCount(); err == nil {
+				c.SetP(v, fmt.Sprintf("schema.%s", k))
+			}
+		}
+	})
+
+	// add HTML-col-tag
+	iterateObj(form.uiSchema, "type", "HorizontalLayout", func(c *gabs.Container) {
+		arrayCount, err := c.ArrayCountP("elements")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		tag := fmt.Sprintf(" column col-%d", 12/arrayCount)
+		for i := range arrayCount {
+			c.SetP(tag, fmt.Sprintf("elements.%d.schema.col", i))
+		}
+	})
+
+	return err
 }
 
-func BuildScreenPageWithData(screens []Screen, schema SchemaJson, uiSchema UIElement, data map[string]interface{}) (string, error) {
-	return buildTemplate(screens, schema, uiSchema, data)
+func (form *Form) BindData(data []byte) error {
+	var err error
+
+	dataParsed, err := gabs.ParseJSON(data)
+	form.data = dataParsed
+
+	// build multiple items for arrays
+	arrayObj, _ := gabs.New().Set("array")
+	iterateObj(form.uiSchema, "schema.type", arrayObj, func(c *gabs.Container) {
+		scope, ok := c.Path("scope").Data().(string)
+		if !ok {
+			err = errors.New(fmt.Sprintf("can't find scope for %v", c))
+		}
+
+		// how many data are there
+		arrayCount, err := form.data.ArrayCountP(gabsPath(scope, false))
+		if err != nil {
+			return
+		}
+
+		// create new array
+		origin := c.Path("options.detail").String()
+		for i := range arrayCount {
+			copy := strings.ReplaceAll(origin, "items/", fmt.Sprintf("%d/", i))
+			newDetails, _ := gabs.ParseJSON([]byte(copy))
+			c.ArrayAppendP(newDetails, "options.detail")
+		}
+		c.ArrayRemoveP(0, "options.detail")
+	})
+
+	// I don't know why....
+	form.uiSchema, _ = gabs.ParseJSON([]byte(form.uiSchema.String()))
+
+	// add data to every control
+	iterateObj(form.uiSchema, "type", "Control", func(c *gabs.Container) {
+		// ignore array-controls
+		schemaType := c.Path("schema.type").Data()
+		if reflect.DeepEqual(schemaType, "array") {
+			return
+		}
+
+		scope, ok := c.Path("scope").Data().(string)
+		if !ok {
+			err = errors.New(fmt.Sprintf("in %v is no scope", c))
+		}
+
+		c.SetP(form.data.Path(gabsPath(scope, false)).Data(), "data")
+	})
+	return err
 }
 
-func buildTemplate(screens []Screen, schema SchemaJson, uiSchema UIElement, data map[string]interface{}) (string, error) {
+func (form *Form) SetMenu(menu []MenuItem) {
+	form.menu = menu
+}
+
+func (form *Form) Build() (string, error) {
 	var builder strings.Builder
 	var err error
 
-	find := func(scope string) SchemaJson {
-		re := regexp.MustCompile(`\d`)
-		scope = re.ReplaceAllString(scope, "items")
-		pathSplits := strings.Split(scope, "/")
-		element, findErr := findElement(pathSplits[1:], schema)
-		if findErr != nil {
-			slog.Error(fmt.Sprintf("%s in %s", findErr.Error(), scope))
-		}
-
-		element["Label"] = pathSplits[len(pathSplits)-1]
-		element["Scope"] = scope
-
-		return element
-	}
-
-	colWidthClass := func(scope string) string {
-		parentsType, elements := uiSchema.FindParentWithScope(scope)
-		if parentsType == "" {
-			slog.Error(fmt.Sprintf("can't find %s", scope))
-		}
-
-		if parentsType != "HorizontalLayout" {
-			return ""
-		}
-
-		return fmt.Sprintf(" column col-%d", 12/len(elements))
-	}
-
-	findData := func(scope string) template.HTMLAttr {
-		scope = strings.TrimPrefix(scope, "#/")
-		scope = strings.ReplaceAll(scope, "properties/", "")
-		// scope = strings.ReplaceAll(scope, "items/", "1/")
-		path := strings.Split(scope, "/")
-
-		jsonParsed := gabs.Wrap(data)
-		value := jsonParsed.Search(path...).Data()
-
-		return template.HTMLAttr(fmt.Sprintf("value=\"%s\"", value))
-	}
-
-	generateItems := func(scope string) []UIElement {
-		element := uiSchema.FindWithScope(scope)
-		if element == nil {
-			return []UIElement{}
-		}
-
-		items := element.Options.Detail.Elements
-		for i := range items {
-			replace := fmt.Sprintf("/%d", i)
-			items[i].Scope = strings.Replace(items[i].Scope, "/items", replace, 1)
-		}
-		fmt.Printf("items: %v\n", items)
-		return items
-	}
-
-	tmpl, err := template.New("").Funcs(template.FuncMap{
-		"find":          find,
-		"colWidthClass": colWidthClass,
-		"findData":      findData,
-		"generateItems": generateItems,
-	}).ParseFS(resources, "html/*")
+	tmpl, err := template.New("").ParseFS(resources, "html/*")
 	if err != nil {
 		return builder.String(), err
 	}
 
+	var uischema map[string]interface{}
+	if err := json.Unmarshal(form.uiSchema.Bytes(), &uischema); err != nil {
+		panic(err)
+	}
+
 	err = tmpl.ExecuteTemplate(&builder, "index.html", map[string]interface{}{
-		"Screens":  screens,
-		"UISchema": uiSchema,
-		"Schema":   schema,
+		"UISchema": uischema,
+		"Menu":     form.menu,
 	})
 
 	return builder.String(), err
 }
 
-func ReadForm(form url.Values) string {
+func ReadForm(urlForm url.Values) string {
 	jsonObj := gabs.New()
 
-	for key, value := range form {
-		path := strings.TrimPrefix(key, "#/")
-		path = strings.ReplaceAll(key, "properties/", "")
-		keys := strings.Split(path, "/")
+	for key, value := range urlForm {
+		path := gabsPath(key, false)
 
 		val := value[0]
-
 		if numVal, err := strconv.Atoi(val); err == nil {
-			jsonObj.Set(numVal, keys...)
+			jsonObj.SetP(numVal, path)
 		} else {
-			jsonObj.Set(val, keys...)
+			jsonObj.SetP(val, path)
 		}
 	}
 
 	return jsonObj.String()
 }
 
-func findElement(path []string, s map[string]interface{}) (SchemaJson, error) {
-	if len(path) == 0 {
-		return s, nil
+func (form *Form) UISchema() []byte {
+	return form.uiSchema.Bytes()
+}
+
+// iterateObj searches for a key and value. If value is empty, it looks only for the key
+func iterateObj(container *gabs.Container, key string, value any, operate func(c *gabs.Container)) {
+	val := container.Path(key).Data()
+	if val != nil && (value == nil || reflect.DeepEqual(val, value)) {
+		operate(container)
 	}
 
-	if _, ok := s[path[0]]; !ok {
-		return nil, errors.New(fmt.Sprintf("Can't find %s", s[path[0]]))
+	for _, child := range container.Children() {
+		iterateObj(child, key, value, operate)
 	}
-	return findElement(path[1:], s[path[0]].(map[string]interface{}))
+}
+
+func gabsPath(scope string, withProperties bool) string {
+	scope = strings.Trim(scope, "#/")
+	if !withProperties {
+		scope = strings.ReplaceAll(scope, "properties/", "")
+	}
+	path := strings.ReplaceAll(scope, "/", ".")
+	return path
 }

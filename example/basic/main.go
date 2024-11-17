@@ -12,46 +12,39 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-var screens = map[string]struct {
-	Schema   string
-	UISchema string
-}{
-	"Basic": {
-		Schema:   "testdata/basic/schema.json",
-		UISchema: "testdata/basic/uischema.json",
-	},
-	"Control": {
-		Schema:   "testdata/control/schema.json",
-		UISchema: "testdata/control/uischema.json",
-	},
-	"RealExample": {
-		Schema:   "testdata/realexample/schema.json",
-		UISchema: "testdata/realexample/uischema.json",
-	},
-}
+var (
+	schema   = "testdata/basic/schema.json"
+	uiSchema = "testdata/basic/uischema.json"
+	data     = "testdata/basic/data.json"
+)
 
 func main() {
-	schemaData, err := os.ReadFile(screens["RealExample"].Schema)
+	schemaData, err := os.ReadFile(schema)
 	if err != nil {
 		panic(err)
 	}
 
-	uiSchemaData, err := os.ReadFile(screens["RealExample"].UISchema)
+	uiSchemaData, err := os.ReadFile(uiSchema)
 	if err != nil {
 		panic(err)
 	}
 
-	var schema gojsonforms.SchemaJson
-	if err := json.Unmarshal(schemaData, &schema); err != nil {
+	dataD, err := os.ReadFile(data)
+	if err != nil {
 		panic(err)
 	}
 
-	var uischema gojsonforms.UIElement
-	if err := json.Unmarshal(uiSchemaData, &uischema); err != nil {
+	site, err := gojsonforms.New(schemaData, uiSchemaData)
+	if err != nil {
 		panic(err)
 	}
 
-	html, err := gojsonforms.BuildSinglePage(schema, uischema)
+	err = site.BindData(dataD)
+	if err != nil {
+		panic(err)
+	}
+
+	html, err := site.Build()
 	if err != nil {
 		panic(err)
 	}
